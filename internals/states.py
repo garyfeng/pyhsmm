@@ -38,8 +38,16 @@ class HMMStatesPython(object):
         return self.model.trans_distn.trans_matrix
 
     @property
+    def meanfield_trans_matrix(self):
+        return self.model.trans_distn.exp_expected_log_trans_matrix
+
+    @property
     def pi_0(self):
         return self.model.init_state_distn.pi_0
+
+    @property
+    def meanfield_pi_0(self):
+        return self.model.init_state_distn.pitilde
 
     @property
     def obs_distns(self):
@@ -164,11 +172,41 @@ class HMMStatesPython(object):
         aBl = self.aBl/self.temp if self.temp is not None else self.aBl
         self.stateseq = self._sample_forwards(betal,self.trans_matrix,self.pi_0,aBl)
 
+    ### Mean Field
+
+    def meanfieldupdate(self):
+        alphal = self.meanfield_alphal = self.meanfield_messages_forwards()
+        betal = self.meanfield_betal = self.meanfield_messages_backwards()
+        Al = np.log(self.meanfield_trans_matrix)
+
+        expectations = self.meanfield_expectations = alphal + betal
+        expectations -= expectations.max(1)[:,na]
+        np.exp(expectations,out=expectations)
+        expectations /= expectations.sum(1)[:,na]
+
+        pairwise = alphal[:-1,:,na] + (betal[1:,na,:] + aBl[1:,na,:]) + Al[na,...]
+        pairwise -= pairwise.max((1,2))[:,na,na]
+        np.exp(pairwise,out=pairwise)
+        pairwise /= pairwise.sum((1,2))[:,na,na]
+        self.meanfield_expected_transcounts = pairwise.sum(0)
+
+        self.stateseq = expectations.argmax(1) # for plotting
+
+    def meanfield_messages_backwards(self):
+        return self._messages_backwards(self.meanfield_trans_matrix,self.aBl)
+
+    def meanfield_messages_forwards(self):
+        return self._messages_forwards(self.meanfield_trans_matrix,self.meanfield_pi_0,self.aBl)
+
+    def get_vlb(self):
+        return np.logaddexp.reduce(
+                self.meanfield_messages_forwards()[0]+self.meanfield_messages_backwards()[0])
+
     ### EM
 
     def E_step(self):
-        alphal = self.alphal = self.messages_forwards()
-        betal = self.betal = self.messages_backwards()
+        alphal = self.messages_forwards()
+        betal = self.messages_backwards()
         aBl = self.aBl
         Al = np.log(self.trans_matrix)
 

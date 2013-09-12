@@ -6,12 +6,16 @@ from ..basic.abstractions import GibbsSampling, MaxLikelihood
 from ..basic.distributions import Categorical
 
 class InitialState(Categorical):
-    def __init__(self,num_states=None,rho=None,pi_0=None):
-        super(InitialState,self).__init__(alpha_0=rho,K=num_states,weights=pi_0)
+    def __init__(self,num_states=None,concentration=None,pi_0=None):
+        super(InitialState,self).__init__(alpha_0=concentration,K=num_states,weights=pi_0)
 
     @property
     def pi_0(self):
         return self.weights
+
+    @property
+    def pitilde(self):
+        return np.exp(super(InitialState,self).log_likelihood())
 
 class StartInZero(GibbsSampling,MaxLikelihood):
     def __init__(self,num_states,**kwargs):

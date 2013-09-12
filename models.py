@@ -9,15 +9,56 @@ import basic.distributions
 from internals import states, initial_state, transitions
 import util.general
 
-# TODO factor out base classes for HMMs and HSMMs
+# TODO TODO factor out base classes for HMMs and HSMMs!!
+
+# TODO make init stuff optional
 # TODO maybe states classes should handle log_likelihood and predictive
 # likelihood methods
 # TODO generate_obs should be here, not in states.py. maybe.
 
 class HMM(ModelGibbsSampling, ModelEM, ModelMAPEM):
     _states_class = states.HMMStatesPython
+    _trans_class = transitions.HMMTransitions
+    _trans_conc_class = transitions.WeakLimitHDPHMMTransitionsConc
+    _init_steady_state_class = initial_state.SteadyState
+
+    def __init__(self,obs_distns,alpha=None,trans_matrix=None,
+            init_state_concentration=None,pi_0=None):
+        self.num_states = len(obs_distns)
+        self.obs_distns = obs_distns
+        self.states_list = []
+        self.trans_distn = self._trans_class(alpha=alpha,trans_matrix=trans_matrix)
+        if init_state_concentration not None or pi_0 is not None:
+            self.init_state_distn = initial_state.InitialState(
+                    concentration=init_state_concentration,
+                    pi_0=pi_0)
+        else:
+            self.init_state_distn = self._init_steady_state_class(self)
+
+    @property
+    def stateseqs(self):
+        'a convenient reference to the state sequence arrays'
+        return [s.stateseq for s in self.states_list]
+
+    @property
+    def Viterbi_stateseqs(self):
+        current_stateseqs = [s.stateseq for s in self.states_list]
+        for s in self.states_list:
+            s.Viterbi()
+        ret = [s.stateseq for s in self.states_list]
+        for s,seq in zip(self.states_list,current_stateseqs):
+            s.stateseq = seq
+        return ret
+
+    def add_data(self,data,stateseq=None,**kwargs):
+        self.states_list.append(self._states_class(model=self,data=np.asarray(data),
+            stateseq=stateseq,**kwargs))
+
+
+class HMM(ModelGibbsSampling, ModelEM, ModelMAPEM):
+    _states_class = states.HMMStatesPython
     _trans_class = transitions.WeakLimitHDPHMMTransitions
-    _trans_class_conc_class = transitions.WeakLimitHDPHMMTransitionsConc
+    _trans_conc_class = transitions.WeakLimitHDPHMMTransitionsConc
     _init_steady_state_class = initial_state.SteadyState
 
     def __init__(self,
@@ -42,7 +83,7 @@ class HMM(ModelGibbsSampling, ModelEM, ModelMAPEM):
                     num_states=self.num_states,
                     alpha=alpha,gamma=gamma)
         else:
-            self.trans_distn = self._trans_class_conc_class(
+            self.trans_distn = self._trans_conc_class(
                     num_states=self.num_states,
                     alpha_a_0=alpha_a_0,alpha_b_0=alpha_b_0,
                     gamma_a_0=gamma_a_0,gamma_b_0=gamma_b_0)
@@ -58,24 +99,7 @@ class HMM(ModelGibbsSampling, ModelEM, ModelMAPEM):
             # steady-state of the transition matrix
             self.init_state_distn = self._init_steady_state_class(self)
 
-    @property
-    def stateseqs(self):
-        'a convenient reference to the state sequence arrays'
-        return [s.stateseq for s in self.states_list]
-
-    @property
-    def Viterbi_stateseqs(self):
-        current_stateseqs = [s.stateseq for s in self.states_list]
-        for s in self.states_list:
-            s.Viterbi()
-        ret = [s.stateseq for s in self.states_list]
-        for s,seq in zip(self.states_list,current_stateseqs):
-            s.stateseq = seq
-        return ret
-
-    def add_data(self,data,stateseq=None,**kwargs):
-        self.states_list.append(self._states_class(model=self,data=np.asarray(data),
-            stateseq=stateseq,**kwargs))
+    # TODO moving stuff up!
 
     def log_likelihood(self,data=None):
         if data is not None:
@@ -191,6 +215,32 @@ class HMM(ModelGibbsSampling, ModelEM, ModelMAPEM):
         new.init_state_distn = self.init_state_distn.copy_sample()
         new.states_list = [s.copy_sample(new) for s in self.states_list]
         return new
+
+    ### Mean Field
+
+    def meanfield_coordinate_descent_step(self):
+        ### coordinate descent sweep
+        for s in self.states_list:
+            if not hasattr(s,'meanfield_expectations'):
+                s.meanfieldupdate()
+
+        for state, distn in enumerate(self.obs_distns):
+            distn.meanfieldupdate([s.data for s in self.states_list],
+                    [s.expectations[:,state] for s in self.states_list])
+        self.trans_distn.meanfieldupdate(expected_transcounts=[s.meanfield_expected_transcounts
+            for s in self.states_list])
+        self.init_distn.meanfieldupdate(data=None,weights=[s.meanfield_expectations[0]
+            for s in self.states_list])
+        for s in self.states_list:
+            s.meanfieldupdate() # NOTE: must come last for vlb calculation
+
+        vlb = 0.
+        vlb += sum(s.get_vlb() for s in self.states_list)
+        vlb += self.trans_distn.get_vlb()
+        vlb += self.init_distn.get_vlb()
+        vlb += sum(o.get_vlb() for o in self.obs_distns)
+
+        return vlb
 
     ### parallel
 
@@ -414,7 +464,7 @@ class StickyHMMEigen(StickyHMM):
 class HSMM(HMM, ModelGibbsSampling, ModelEM, ModelMAPEM):
     _states_class = states.HSMMStatesPython
     _trans_class = transitions.WeakLimitHDPHSMMTransitions
-    _trans_class_conc_class = transitions.WeakLimitHDPHSMMTransitionsConc
+    _trans_conc_class = transitions.WeakLimitHDPHSMMTransitionsConc
     _init_steady_state_class = initial_state.HSMMSteadyState
 
     def __init__(self,dur_distns,**kwargs):

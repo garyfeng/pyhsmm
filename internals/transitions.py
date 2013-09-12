@@ -82,7 +82,8 @@ class HMMTransitions(object):
             for d in self._row_distns])) # NOTE: see Multinomial.expected_log_likelihood
 
     def meanfieldupdate(self,expected_transcounts):
-        trans_softcounts = sum(expected_transcounts)
+        trans_softcounts = sum(expected_transcounts) if isinstance(expected_transcounts,list) \
+                else expected_transcounts
         for d, counts in zip(self._row_distns, trans_softcounts):
             d.meanfieldupdate(None,counts) # None is placeholder, see Multinomial class def
         return self
