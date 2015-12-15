@@ -1,7 +1,9 @@
-**NOTE: I pushed some big changes recently, so things may be a bit bumpy...**
+[![Build
+Status](https://travis-ci.org/mattjj/pyhsmm.svg?branch=master)](https://travis-ci.org/mattjj/pyhsmm)
 
-# Sampling Inference for Bayesian HSMMs and HMMs #
-This is a Python library for approximate unsupervised sampling inference in
+# Bayesian inference in HSMMs and HMMs #
+
+This is a Python library for approximate unsupervised inference in
 Bayesian Hidden Markov Models (HMMs) and explicit-duration Hidden semi-Markov
 Models (HSMMs), focusing on the Bayesian Nonparametric extensions, the HDP-HMM
 and HDP-HSMM, mostly with weak-limit approximations.
@@ -9,34 +11,27 @@ and HDP-HSMM, mostly with weak-limit approximations.
 There are also some extensions:
 
 * [autoregressive models](https://github.com/mattjj/pyhsmm-autoregressive)
+* [switching linear dynamical systems](https://github.com/mattjj/pyhsmm-slds)
 * [factorial models](https://github.com/mattjj/pyhsmm-factorial)
-* [collapsed HDP sampling inference](https://github.com/mattjj/pyhsmm-collapsedinfinite).
 
-## Building and Running ##
-This library depends on having numpy, scipy, cython, and matplotlib installed.
-You can clone this library and its other dependencies into your current working
-directory with
+## Installing from PyPI ##
+
+Give this a shot:
 
 ```bash
-git clone --recursive git://github.com/mattjj/pyhsmm.git
+pip install pyhsmm
 ```
 
-Build it with
+You may need to install a compiler with `-std=c++11` support, like gcc-4.7 or higher.
+
+To install manually from the git repo, you'll need `cython`. Then try this:
 
 ```bash
-cd pyhsmm
-python setup.py build_ext --inplace
+python setup.py install
 ```
 
-Tested with g++ 4.8 (recommended) and the clang++ that ships with OS X 10.8.
-
-Some things to keep in mind:
-* if you use OS X's default (clang) compiler on OS 10.8 or earlier, you should
-  pass the `--with-old-clang` option or set `CCFLAGS` and `LDFLAGS` to include
-`-stdlib=libc++`
-* to use processor-tuned instructions with g++, you can pass the
-  `--with-native` flag or set `CCFLAGS` to include `-march=native`, but the
-  assembler that ships with OS X 10.8 is too old to know about AVX instructions
+It might also help to look at the [travis file](https://raw.githubusercontent.com/mattjj/pyhsmm/master/.travis.yml) to
+see how to set up a working install from scratch.
 
 ## Running ##
 
@@ -50,6 +45,7 @@ might also want to add pyhsmm to your global Python path (e.g. by copying it to
 your site-packages directory).
 
 ## A Simple Demonstration ##
+
 Here's how to draw from the HDP-HSMM posterior over HSMMs given a sequence of
 observations. (The same example, along with the code to generate the synthetic
 data loaded in this example, can be found in `examples/basic.py`.)
@@ -187,10 +183,13 @@ with open('sampled_models.pickle','w') as outfile:
 
 ## Extending the Code ##
 To add your own observation or duration distributions, implement the interfaces
-defined in `basic/abstractions.py`. Also see the plugins. To get a flavor of
+defined in `basic/abstractions.py`. To get a flavor of
 the style, see [pybasicbayes](https://github.com/mattjj/pybasicbayes).
 
 ## References ##
+* Matthew J. Johnson. [Bayesian Time Series Models and Scalable
+  Inference](http://www.mit.edu/~mattjj/thesis.pdf). MIT PhD Thesis, May 2014.
+
 * Matthew J. Johnson and Alan S. Willsky. [Bayesian Nonparametric Hidden
   Semi-Markov Models](http://www.jmlr.org/papers/volume14/johnson13a/johnson13a.pdf).
   Journal of Machine Learning Research (JMLR), 14:673–701, February 2013.
@@ -211,4 +210,8 @@ the style, see [pybasicbayes](https://github.com/mattjj/pybasicbayes).
     year={2013},
 }
 ```
+
+## Authors ##
+
+[Matt Johnson](https://github.com/mattjj), [Alex Wiltschko](https://github.com/alexbw), [Yarden Katz](https://github.com/yarden), [Chia-ying (Jackie) Lee](https://github.com/jacquelineCelia), [Scott Linderman](https://github.com/slinderman), [Kevin Squire](https://github.com/kmsquire), [Nick Foti](https://github.com/nfoti).
 
